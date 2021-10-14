@@ -1,12 +1,17 @@
 import Head from "next/head";
 import Link from "next/link";
 import { getDatabase } from "../lib/notion";
-import { Text } from "./[id].js";
+import { Text } from "./[id]";
 import styles from "./index.module.css";
+import { Page } from "@notionhq/client/build/src/api-types";
 
-export const databaseId = process.env.NOTION_DATABASE_ID;
+export const databaseId: string = process.env.NOTION_DATABASE_ID as string;
 
-export default function Home({ posts }) {
+export interface HomeProps {
+  posts: Page[];
+}
+
+export default function Home({ posts }: HomeProps) {
   return (
     <div>
       <Head>
@@ -54,8 +59,11 @@ export default function Home({ posts }) {
             the source code on{" "}
             <a href="https://github.com/samuelkraft/notion-blog-nextjs">
               Github
-            </a> or read{" "}
-            <a href="https://samuelkraft.com/blog/building-a-notion-blog-with-public-api">my blogpost</a>{" "}
+            </a>{" "}
+            or read{" "}
+            <a href="https://samuelkraft.com/blog/building-a-notion-blog-with-public-api">
+              my blog post
+            </a>{" "}
             on building your own.
           </p>
         </header>
@@ -76,7 +84,7 @@ export default function Home({ posts }) {
                 <h3 className={styles.postTitle}>
                   <Link href={`/${post.id}`}>
                     <a>
-                      <Text text={post.properties.Name.title} />
+                      <Text text={(post.properties.Name as any).title} />
                     </a>
                   </Link>
                 </h3>

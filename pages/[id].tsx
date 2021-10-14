@@ -2,38 +2,59 @@ import { Fragment } from "react";
 import Head from "next/head";
 import { getDatabase, getPage, getBlocks } from "../lib/notion";
 import Link from "next/link";
-import { databaseId } from "./index.js";
+import { databaseId } from "./index";
 import styles from "./post.module.css";
+import { GetStaticPropsContext } from "next";
+import {
+  Block,
+  Page,
+  RichTextTextInput,
+} from "@notionhq/client/build/src/api-types";
 
-export const Text = ({ text }) => {
+export const Text = ({ text }: { text: RichTextTextInput[] }) => {
   if (!text) {
     return null;
   }
-  return text.map((value) => {
-    const {
-      annotations: { bold, code, color, italic, strikethrough, underline },
-      text,
-    } = value;
-    return (
-      <span
-        className={[
-          bold ? styles.bold : "",
-          code ? styles.code : "",
-          italic ? styles.italic : "",
-          strikethrough ? styles.strikethrough : "",
-          underline ? styles.underline : "",
-        ].join(" ")}
-        style={color !== "default" ? { color } : {}}
-      >
-        {text.link ? <a href={text.link.url}>{text.content}</a> : text.content}
-      </span>
-    );
-  });
+  return (
+    <>
+      {text.map((value) => {
+        const {
+          annotations: {
+            bold,
+            code,
+            color,
+            italic,
+            strikethrough,
+            underline,
+          } = {},
+          text,
+        } = value;
+        return (
+          <span
+            className={[
+              bold ? styles.bold : "",
+              code ? styles.code : "",
+              italic ? styles.italic : "",
+              strikethrough ? styles.strikethrough : "",
+              underline ? styles.underline : "",
+            ].join(" ")}
+            style={color !== "default" ? { color } : {}}
+          >
+            {text.link ? (
+              <a href={text.link.url}>{text.content}</a>
+            ) : (
+              text.content
+            )}
+          </span>
+        );
+      })}
+    </>
+  );
 };
 
-const renderBlock = (block) => {
+const renderBlock = (block: Block) => {
   const { type, id } = block;
-  const value = block[type];
+  const value = block[type as keyof Block] as any;
 
   switch (type) {
     case "paragraph":
@@ -82,7 +103,7 @@ const renderBlock = (block) => {
           <summary>
             <Text text={value.text} />
           </summary>
-          {value.children?.map((block) => (
+          {value.children?.map((block: Block) => (
             <Fragment key={block.id}>{renderBlock(block)}</Fragment>
           ))}
         </details>
@@ -106,20 +127,25 @@ const renderBlock = (block) => {
   }
 };
 
-export default function Post({ page, blocks }) {
+export interface PostProps {
+  page: Page;
+  blocks: Block[];
+}
+
+export default function Post({ page, blocks }: PostProps) {
   if (!page || !blocks) {
     return <div />;
   }
   return (
     <div>
       <Head>
-        <title>{page.properties.Name.title[0].plain_text}</title>
+        <title>{(page.properties.Name as any).title[0].plain_text}</title>
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
       <article className={styles.container}>
         <h1 className={styles.name}>
-          <Text text={page.properties.Name.title} />
+          <Text text={(page.properties.Name as any).title} />
         </h1>
         <section>
           {blocks.map((block) => (
@@ -142,10 +168,25 @@ export const getStaticPaths = async () => {
   };
 };
 
-export const getStaticProps = async (context) => {
+export const getStaticProps = async (
+  context: GetStaticPropsContext<{ id: string }>
+) => {
+  if (!context.params) {
+    return {
+      notFound: true,
+    };
+  }
+
   const { id } = context.params;
   const page = await getPage(id);
-  const blocks = await getBlocks(id);
+
+  if (page === null) {
+    return {
+      notFound: true,
+    };
+  }
+
+  const blocks: Block[] = await getBlocks(id);
 
   // Retrieve block children for nested blocks (one level deep), for example toggle blocks
   // https://developers.notion.com/docs/working-with-page-content#reading-nested-blocks
@@ -161,10 +202,12 @@ export const getStaticProps = async (context) => {
   );
   const blocksWithChildren = blocks.map((block) => {
     // Add child blocks if the block should contain children but none exists
-    if (block.has_children && !block[block.type].children) {
-      block[block.type]["children"] = childBlocks.find(
-        (x) => x.id === block.id
-      )?.children;
+    if (
+      block.has_children &&
+      !(block[block.type as keyof typeof block] as any).children
+    ) {
+      (block[block.type as keyof typeof block] as any)["children"] =
+        childBlocks.find((x) => x.id === block.id)?.children;
     }
     return block;
   });
